@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import TodoForm from './TodoForm';
-import { todoAPI } from '../../services/api';
+import { todoService, stampService } from '../../services/storage';
 import { useToast } from '../../context/ToastContext';
 
 const priorityBadge = { HIGH: 'bg-red-100 text-danger', MEDIUM: 'bg-yellow-100 text-warning', LOW: 'bg-green-100 text-success' };
@@ -9,47 +9,26 @@ const priorityLabel = { HIGH: '높음', MEDIUM: '보통', LOW: '낮음' };
 const TodoItem = ({ todo, onUpdated, onDeleted, onStampEarned }) => {
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [loading, setLoading] = useState(false);
   const { addToast } = useToast();
 
-  const handleComplete = async () => {
-    setLoading(true);
-    try {
-      const { data } = await todoAPI.complete(todo.id);
-      if (data.stampResult) onStampEarned(data.stampResult);
-      onUpdated(data.todo);
-    } catch {
-      addToast('오류가 발생했습니다.', 'error');
-    } finally {
-      setLoading(false);
+  const handleComplete = () => {
+    const updated = todoService.toggle(todo.id);
+    if (updated.isCompleted) {
+      const stampResult = stampService.checkAndEarn(updated.dueDate);
+      if (stampResult) onStampEarned(stampResult);
     }
+    onUpdated();
   };
 
-  const handleEdit = async (form) => {
-    setLoading(true);
-    try {
-      const { data } = await todoAPI.update(todo.id, form);
-      onUpdated(data);
-      setEditing(false);
-      addToast('수정되었습니다.', 'success');
-    } catch (err) {
-      addToast(err.response?.data?.message || '수정에 실패했습니다.', 'error');
-    } finally {
-      setLoading(false);
-    }
+  const handleEdit = (form) => {
+    todoService.update(todo.id, form);
+    onUpdated();
+    setEditing(false);
+    addToast('수정되었습니다.', 'success');
   };
 
-  const handleDelete = async () => {
-    setLoading(true);
-    try {
-      await todoAPI.delete(todo.id);
-      onDeleted(todo.id);
-      addToast('삭제되었습니다.', 'success');
-    } catch {
-      addToast('삭제에 실패했습니다.', 'error');
-    } finally {
-      setLoading(false);
-    }
+  const handleDelete = () => {
+    onDeleted(todo.id);
   };
 
   if (editing) return (
@@ -58,7 +37,6 @@ const TodoItem = ({ todo, onUpdated, onDeleted, onStampEarned }) => {
         initial={{ title: todo.title, description: todo.description || '', priority: todo.priority, dueDate: todo.dueDate, id: todo.id }}
         onSubmit={handleEdit}
         onCancel={() => setEditing(false)}
-        loading={loading}
       />
     </div>
   );
@@ -66,8 +44,10 @@ const TodoItem = ({ todo, onUpdated, onDeleted, onStampEarned }) => {
   return (
     <div className={`bg-white rounded-xl shadow-sm border transition ${todo.isCompleted ? 'border-gray-100 opacity-70' : 'border-gray-200 hover:shadow-md'}`}>
       <div className="p-4 flex items-start gap-3">
-        <button onClick={handleComplete} disabled={loading}
-          className={`mt-0.5 w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition ${todo.isCompleted ? 'bg-success border-success text-white' : 'border-gray-300 hover:border-primary'}`}>
+        <button
+          onClick={handleComplete}
+          className={`mt-0.5 w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition ${todo.isCompleted ? 'bg-success border-success text-white' : 'border-gray-300 hover:border-primary'}`}
+        >
           {todo.isCompleted && <span className="text-xs">✓</span>}
         </button>
         <div className="flex-1 min-w-0">
@@ -95,7 +75,7 @@ const TodoItem = ({ todo, onUpdated, onDeleted, onStampEarned }) => {
           <p className="text-sm text-gray-700">정말 삭제하시겠습니까?</p>
           <div className="flex gap-2">
             <button onClick={() => setConfirmDelete(false)} className="text-sm px-3 py-1 rounded-lg bg-white border border-gray-300 text-gray-600 hover:bg-gray-50">취소</button>
-            <button onClick={handleDelete} disabled={loading} className="text-sm px-3 py-1 rounded-lg bg-danger text-white hover:bg-red-600 disabled:opacity-60">삭제</button>
+            <button onClick={handleDelete} className="text-sm px-3 py-1 rounded-lg bg-danger text-white hover:bg-red-600">삭제</button>
           </div>
         </div>
       )}

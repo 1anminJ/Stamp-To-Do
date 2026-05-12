@@ -1,45 +1,24 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { authAPI } from '../services/api';
+import React, { createContext, useContext, useState } from 'react';
+import { userService } from '../services/storage';
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(() => userService.get());
 
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      authAPI.verify()
-        .then(({ data }) => setUser(data))
-        .catch(() => localStorage.removeItem('token'))
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
-  }, []);
-
-  const login = async (email, password) => {
-    const { data } = await authAPI.login({ email, password });
-    localStorage.setItem('token', data.token);
-    setUser({ userId: data.userId, email: data.email, displayName: data.displayName });
-    return data;
-  };
-
-  const register = async (email, password, displayName) => {
-    const { data } = await authAPI.register({ email, password, displayName });
-    localStorage.setItem('token', data.token);
-    setUser({ userId: data.userId, email: data.email, displayName: data.displayName });
-    return data;
+  const login = (displayName) => {
+    const userData = { displayName: displayName.trim() };
+    userService.set(userData);
+    setUser(userData);
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
+    userService.clear();
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, login, logout, loading: false }}>
       {children}
     </AuthContext.Provider>
   );

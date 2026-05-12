@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { todoAPI, stampAPI } from '../services/api';
+import { todoService, stampService } from '../services/storage';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import TodoForm from '../components/todo/TodoForm';
@@ -13,67 +13,47 @@ const DashboardPage = () => {
   const { user } = useAuth();
   const { addToast } = useToast();
   const [todos, setTodos] = useState([]);
-  const [stamp, setStamp] = useState(null);
+  const [stamp, setStamp] = useState({ stampCount: 0 });
   const [showForm, setShowForm] = useState(false);
-  const [formLoading, setFormLoading] = useState(false);
   const [filter, setFilter] = useState('all');
   const [sort, setSort] = useState('createdAt');
   const [selectedDate, setSelectedDate] = useState(today());
-  const [pageLoading, setPageLoading] = useState(true);
   const [celebration, setCelebration] = useState(false);
 
-  const fetchTodos = useCallback(async () => {
-    try {
-      const params = { date: selectedDate };
-      if (filter !== 'all') params.filter = filter;
-      if (sort === 'priority') params.sort = 'priority';
-      const { data } = await todoAPI.getAll(params);
-      setTodos(data);
-    } catch {
-      addToast('할 일 목록을 불러오지 못했습니다.', 'error');
-    }
+  const refreshTodos = useCallback(() => {
+    setTodos(todoService.getAll({ date: selectedDate, filter, sort }));
   }, [selectedDate, filter, sort]);
 
-  const fetchStamp = useCallback(async () => {
-    try {
-      const { data } = await stampAPI.getCurrent();
-      setStamp(data);
-    } catch {}
+  const refreshStamp = useCallback(() => {
+    setStamp(stampService.get());
   }, []);
 
-  useEffect(() => {
-    setPageLoading(true);
-    Promise.all([fetchTodos(), fetchStamp()]).finally(() => setPageLoading(false));
-  }, [fetchTodos, fetchStamp]);
+  useEffect(() => { refreshTodos(); }, [refreshTodos]);
+  useEffect(() => { refreshStamp(); }, [refreshStamp]);
 
-  const handleCreate = async (form) => {
-    setFormLoading(true);
-    try {
-      const { data } = await todoAPI.create(form);
-      setTodos(prev => [data, ...prev]);
-      setShowForm(false);
-      addToast('할 일이 추가되었습니다! ✅', 'success');
-    } catch (err) {
-      addToast(err.response?.data?.message || '추가에 실패했습니다.', 'error');
-    } finally {
-      setFormLoading(false);
-    }
+  const handleCreate = (form) => {
+    todoService.create(form);
+    refreshTodos();
+    setShowForm(false);
+    addToast('할 일이 추가되었습니다! ✅', 'success');
   };
 
-  const handleUpdated = (updatedTodo) => {
-    setTodos(prev => prev.map(t => t.id === updatedTodo.id ? updatedTodo : t));
-    fetchStamp();
+  const handleUpdated = () => {
+    refreshTodos();
+    refreshStamp();
   };
 
   const handleDeleted = (id) => {
-    setTodos(prev => prev.filter(t => t.id !== id));
+    todoService.delete(id);
+    refreshTodos();
+    addToast('삭제되었습니다.', 'success');
   };
 
   const handleStampEarned = (stampResult) => {
-    fetchStamp();
+    refreshStamp();
     if (stampResult.hallOfFame) {
       setCelebration(true);
-    } else if (stampResult.earned) {
+    } else {
       addToast(stampResult.message, 'success');
     }
   };
@@ -84,7 +64,6 @@ const DashboardPage = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-5xl mx-auto px-4 py-6">
-        {/* 인사 */}
         <div className="mb-6">
           <h2 className="text-2xl font-bold text-gray-800">안녕하세요, {user?.displayName}님! 👋</h2>
           <p className="text-gray-500 text-sm mt-1">오늘도 할 일을 완료하고 스탬프를 모아보세요</p>
@@ -95,7 +74,6 @@ const DashboardPage = () => {
           <div className="lg:col-span-1 space-y-4">
             <StampProgress stampCount={stamp?.stampCount} />
 
-            {/* 오늘의 진행률 */}
             {totalCount > 0 && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
                 <h3 className="font-semibold text-gray-700 mb-3 flex items-center gap-2">
@@ -118,7 +96,7 @@ const DashboardPage = () => {
 
           {/* 오른쪽: 할 일 목록 */}
           <div className="lg:col-span-2 space-y-4">
-            {/* 헤더 + 컨트롤 */}
+            {/* 필터 컨트롤 */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
               <div className="flex flex-col sm:flex-row gap-3">
                 <div className="flex-1">
@@ -148,7 +126,7 @@ const DashboardPage = () => {
               </div>
             </div>
 
-            {/* 추가 버튼 */}
+            {/* 추가 버튼 / 폼 */}
             {!showForm ? (
               <button onClick={() => setShowForm(true)}
                 className="w-full bg-primary text-white font-semibold py-3 rounded-xl hover:bg-indigo-700 transition flex items-center justify-center gap-2">
@@ -161,18 +139,12 @@ const DashboardPage = () => {
                   initial={{ dueDate: selectedDate }}
                   onSubmit={handleCreate}
                   onCancel={() => setShowForm(false)}
-                  loading={formLoading}
                 />
               </div>
             )}
 
             {/* 할 일 목록 */}
-            {pageLoading ? (
-              <div className="text-center py-12 text-gray-400">
-                <div className="text-4xl mb-3">⏳</div>
-                <p>불러오는 중...</p>
-              </div>
-            ) : todos.length === 0 ? (
+            {todos.length === 0 ? (
               <div className="text-center py-12 text-gray-400 bg-white rounded-2xl border border-gray-200">
                 <div className="text-5xl mb-3">📝</div>
                 <p className="font-medium text-gray-600">할 일이 없습니다</p>
@@ -181,10 +153,13 @@ const DashboardPage = () => {
             ) : (
               <div className="space-y-3">
                 {todos.map(todo => (
-                  <TodoItem key={todo.id} todo={todo}
+                  <TodoItem
+                    key={todo.id}
+                    todo={todo}
                     onUpdated={handleUpdated}
                     onDeleted={handleDeleted}
-                    onStampEarned={handleStampEarned} />
+                    onStampEarned={handleStampEarned}
+                  />
                 ))}
               </div>
             )}
