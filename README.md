@@ -13,6 +13,8 @@
 | 대상 | 학생, 직장인 등 일상적인 할 일 관리와 동기부여가 필요한 누구나 |
 |---|---|
 | 핵심 가치 | 완료의 즐거움 → 스탬프 적립 → 명예의 전당 등록 |
+| 데이터 저장 | 브라우저 localStorage (서버 불필요) |
+| 배포 | AWS S3 정적 웹 호스팅 + GitHub Actions 자동 배포 |
 
 ---
 
@@ -39,16 +41,13 @@
 
 ### 4. 🏆 명예의 전당
 - 스탬프 10개 달성 시 **자동으로 명예의 전당 등록**
-- 달성 횟수(achievementCount) **내림차순 순위표**
-- 달성 횟수만큼 ⭐ 표시 + 마지막 달성일 표기
-- 나의 기록 별도 하이라이트 카드 표시
-- 재달성 시 achievementCount 자동 누적
+- 나의 달성 히스토리를 날짜별로 기록
+- 달성 횟수 및 달성일 표기
+- 재달성 시 횟수 자동 누적
 
-### 5. 🔐 사용자 계정 관리
-- **회원가입** — 이메일 중복 확인, 비밀번호 강도 인디케이터, 실시간 유효성 검증
-- **로그인** — JWT 토큰 발급 (30일 유효)
-- **자동 로그인** — 앱 재방문 시 토큰 자동 검증
-- **비밀번호 재설정** — 이메일 입력 → 재설정 링크 발송 → 새 비밀번호 설정
+### 5. 👤 사용자 설정
+- **닉네임 입력** — 별도 회원가입 없이 닉네임만 입력하면 바로 시작
+- **자동 유지** — 브라우저를 닫아도 localStorage에 저장되어 재방문 시 유지
 
 ---
 
@@ -61,17 +60,14 @@
 | 라우팅 | React Router v7 |
 | 상태관리 | Context API (AuthContext, ToastContext) |
 | 스타일링 | Tailwind CSS v3 |
-| HTTP 클라이언트 | Axios |
+| 데이터 저장 | localStorage |
 
-### Backend
+### 인프라 & 배포
 | 항목 | 기술 |
 |---|---|
-| 런타임 | Node.js |
-| 프레임워크 | Express.js |
-| 데이터베이스 | SQLite |
-| ORM | Sequelize |
-| 인증 | JWT + bcrypt |
-| 보안 | express-rate-limit, CORS |
+| 호스팅 | AWS S3 정적 웹 호스팅 |
+| CI/CD | GitHub Actions |
+| 배포 트리거 | `main` 브랜치 push |
 
 ---
 
@@ -79,28 +75,25 @@
 
 ```
 stamp-todo/
-├── backend/
-│   └── src/
-│       ├── config/        # DB 설정 (SQLite)
-│       ├── middleware/    # JWT 인증 미들웨어
-│       ├── models/        # User, Todo, Stamp, StampHistory, HallOfFame, PasswordReset
-│       ├── routes/        # auth, todos, stamps, hall-of-fame
-│       └── server.js
+├── .github/
+│   └── workflows/
+│       └── deploy.yml       # GitHub Actions S3 자동 배포
 ├── src/
 │   ├── components/
-│   │   ├── layout/        # Navbar
-│   │   ├── todo/          # TodoForm, TodoItem
-│   │   └── stamps/        # StampProgress, CelebrationModal
-│   ├── context/           # AuthContext, ToastContext
-│   ├── pages/             # Login, Register, Dashboard, HallOfFame, ...
-│   ├── services/          # api.js (axios 인스턴스 + API 함수)
+│   │   ├── layout/          # Navbar
+│   │   ├── todo/            # TodoForm, TodoItem
+│   │   └── stamps/          # StampProgress, CelebrationModal
+│   ├── context/             # AuthContext, ToastContext
+│   ├── pages/               # LoginPage, DashboardPage, HallOfFamePage
+│   ├── services/
+│   │   └── storage.js       # localStorage 기반 데이터 서비스
 │   └── App.js
 └── package.json
 ```
 
 ---
 
-## 🚀 실행 방법
+## 🚀 로컬 실행 방법
 
 ### 사전 준비
 - Node.js 18 이상
@@ -113,54 +106,72 @@ stamp-todo/
 git clone https://github.com/your-username/stamp-todo.git
 cd stamp-todo
 
-# 2. 프론트엔드 패키지 설치
+# 2. 패키지 설치
 npm install
 
-# 3. 백엔드 패키지 설치
-cd backend && npm install && cd ..
-
-# 4. 개발 서버 실행 (프론트 + 백엔드 동시)
-npm run dev
+# 3. 개발 서버 실행
+npm start
 ```
 
-| 서버 | 주소 |
-|---|---|
-| 프론트엔드 | http://localhost:3000 |
-| 백엔드 API | http://localhost:5001 |
-
-> **SQLite DB**는 최초 실행 시 `backend/database.sqlite` 파일로 자동 생성됩니다.
+브라우저에서 `http://localhost:3000` 접속 후 닉네임을 입력하면 바로 사용할 수 있습니다.
 
 ---
 
-## 📡 API 엔드포인트
+## ☁️ 배포 (AWS S3 + GitHub Actions)
 
-### 인증
-```
-POST  /auth/register          회원가입
-POST  /auth/login             로그인
-POST  /auth/logout            로그아웃
-GET   /auth/verify            토큰 검증
-POST  /auth/forgot-password   비밀번호 재설정 요청
-POST  /auth/reset-password    비밀번호 재설정 확인
-```
+### 배포 흐름
 
-### To-Do
 ```
-GET    /api/todos              목록 조회 (?date, ?filter, ?sort)
-POST   /api/todos              할 일 생성
-GET    /api/todos/:id          단건 조회
-PUT    /api/todos/:id          수정
-DELETE /api/todos/:id          삭제
-PATCH  /api/todos/:id/complete 완료 상태 토글 + 스탬프 체크
+main 브랜치에 push
+  → GitHub Actions 자동 실행
+  → npm install & npm run build
+  → AWS 자격증명 설정 (GitHub Secrets)
+  → aws s3 sync ./build → s3://mybucket-20263606 --delete
 ```
 
-### 스탬프 & 명예의 전당
+### GitHub Secrets 설정
+
+배포를 위해 GitHub 리포지토리의 **Settings → Secrets**에 아래 항목을 등록해야 합니다.
+
+| Secret 이름 | 설명 |
+|---|---|
+| `AWS_ACCESS_KEY_ID` | AWS IAM 액세스 키 ID |
+| `AWS_SECRET_ACCESS_KEY` | AWS IAM 시크릿 액세스 키 |
+| `AWS_SESSION_TOKEN` | AWS Academy 환경 세션 토큰 |
+
+### S3 버킷 설정 요구사항
+
+| 항목 | 설정값 |
+|---|---|
+| 정적 웹 호스팅 | 활성화 |
+| 인덱스 문서 | `index.html` |
+| 오류 문서 | `index.html` (React Router 대응) |
+| 퍼블릭 액세스 차단 | 모두 해제 |
+| 버킷 정책 | `s3:GetObject` 공개 허용 |
+
+### 배포 URL 확인
+
 ```
-GET  /api/stamps/current      현재 스탬프 정보
-GET  /api/stamps/history      스탬프 적립 내역
-GET  /api/hall-of-fame        전체 명예의 전당 목록
-GET  /api/hall-of-fame/me     나의 명예의 전당 기록
+AWS 콘솔 → S3 → mybucket-20263606
+  → [속성] 탭 → 정적 웹 사이트 호스팅
+  → 버킷 웹 사이트 엔드포인트 확인
 ```
+
+---
+
+## 💾 데이터 저장 구조
+
+모든 데이터는 서버 없이 **브라우저 localStorage**에 저장됩니다.
+
+| 키 | 저장 내용 |
+|---|---|
+| `stamp_user` | 닉네임 등 사용자 정보 |
+| `stamp_todos` | 전체 할 일 목록 |
+| `stamp_data` | 현재 스탬프 카운트 및 마지막 달성일 |
+| `stamp_history` | 날짜별 스탬프 적립 히스토리 |
+| `stamp_hof` | 명예의 전당 달성 기록 |
+
+> ⚠️ 브라우저 캐시/데이터를 삭제하면 저장된 데이터가 초기화됩니다.
 
 ---
 
@@ -173,24 +184,3 @@ GET  /api/hall-of-fame/me     나의 명예의 전당 기록
 | Warning | 앰버 | `#F59E0B` |
 | Danger | 레드 | `#EF4444` |
 | Star (스탬프) | 골드 | `#FFD700` |
-
----
-
-## 🔒 보안
-
-- 비밀번호: bcrypt 해시 (saltRounds: 10)
-- JWT 서버 시크릿 키 서명
-- Rate Limiting: 인증 엔드포인트 15분당 20회 제한
-- CORS: 프론트엔드 도메인(localhost:3000)만 허용
-- 소유권 검증: 모든 Todo API에서 userId 일치 여부 확인
-- 비밀번호 재설정 토큰: UUID + 1시간 만료
-
----
-
-## 📦 배포
-
-| 영역 | 추천 서비스 |
-|---|---|
-| Frontend | Vercel, Netlify |
-| Backend | Railway, Render, Heroku |
-| Database | PostgreSQL (Neon, AWS RDS) |
