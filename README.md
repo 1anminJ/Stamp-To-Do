@@ -4,6 +4,16 @@
 
 ---
 
+## 🎬 시연 영상
+
+### GitHub CI/CD 시연
+[![Stamp To-Do GitHub CI/CD 시연영상](https://img.youtube.com/vi/KwDXM7c3H-Q/0.jpg)](https://youtu.be/KwDXM7c3H-Q)
+
+### AWS Amplify 서비스 활용 시연
+[![Stamp To-Do AWS Amplify 서비스 활용 시연 영상](https://img.youtube.com/vi/Mao5izLVZw4/0.jpg)](https://youtu.be/Mao5izLVZw4)
+
+---
+
 ## 📌 프로젝트 소개
 
 **Stamp To-Do**는 단순한 할 일 관리를 넘어, 매일의 목표 달성에 **동기부여**를 더해주는 앱입니다.
